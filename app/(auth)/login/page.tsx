@@ -1,124 +1,173 @@
-// app/login/page.tsx
+"use client";
+import React, { useState, FormEvent } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-export default function LoginPage() {
-  const thumbnails = Array.from({ length: 8 }).map((_, i) => ({
-    id: i,
-    title: `Design ${i + 1}`,
-    src: `/placeholders/thumb-${(i % 6) + 1}.jpg`,
-  }));
+type Role = "student" | "faculty";
+
+const PRIMARY = "green-600";
+const PRIMARY_HOVER = "green-700";
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<Role>("student");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const router = useRouter();
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, role }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    toast.error(data.message || "Login failed");
+    setError(data.message || "Login failed");
+    setLoading(false);
+    return;
+  }
+
+  // success toast
+  toast.success("Login Successful!");
+
+  // save token
+  localStorage.setItem("token", data.token);
+  localStorage.setItem("role", role);
+  localStorage.setItem("firstname", data.firstname);
+
+  // redirect role-wise
+  if (role === "student") router.push("/student-dashboard");
+  else router.push("/faculty-dashboard");
+
+    } catch (err) {
+      toast.error("Something went wrong. Try again.");
+      setError("Something went wrong. Try again.");
+    }
+
+
+    setLoading(false);
+   
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <div className="flex flex-1 items-stretch">
-        {/* LEFT: Branding */}
-        <aside className="w-full md:w-1/2 lg:w-2/5 bg-gradient-to-br from-indigo-600 via-violet-500 to-pink-500 text-white p-8 flex flex-col justify-center">
-          <div className="max-w-lg mx-auto">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="bg-white/10 p-3 rounded-md">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 14l9-5-9-5-9 5 9 5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 14l6.16-3.422A12 12 0 0112 21a12 12 0 01-6.16-10.422L12 14z" />
-                </svg>
-              </div>
-              <h1 className="text-3xl font-semibold">OnlyCampus</h1>
-            </div>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-green-50">
 
-            <p className="text-lg font-medium leading-relaxed mb-6">
-              Revolutionizing Campus Experience
-            </p>
+      {/* Soft Radial Gradients */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_30%_30%,#d1fae5_0%,transparent_50%)] opacity-60"></div>
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_70%_70%,#bbf7d0_0%,transparent_50%)] opacity-60"></div>
 
-            <p className="text-sm opacity-90 mb-8">
-              OnlyCampus is the unified platform for students, faculty and admins — classes, announcements, grading, attendance and campus workflows in one place.
-            </p>
+      <div className="relative flex w-full max-w-7xl items-center justify-between px-6 lg:px-12 xl:px-20 gap-10 xl:gap-24">
 
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <li className="bg-white/10 rounded-md p-3">Student-centric</li>
-              <li className="bg-white/10 rounded-md p-3">Faculty tools</li>
-              <li className="bg-white/10 rounded-md p-3">Role-based access</li>
-              <li className="bg-white/10 rounded-md p-3">Secure auth</li>
-            </ul>
+        {/* Branding */}
+        <div className="hidden lg:flex w-1/2 flex-col items-center justify-center px-6">
+          <div className="h-32 w-32 bg-white rounded-3xl shadow-lg flex items-center justify-center mb-8 border border-green-200 overflow-hidden">
+            <Image
+              src="/logo4.png"
+              alt="OnlyCampus Logo"
+              width={256}
+              height={256}
+              className="object-cover scale-150"
+              priority
+            />
           </div>
-        </aside>
 
-        {/* RIGHT: Auth + Inspiration gallery */}
-        <main className="w-full md:w-1/2 lg:w-3/5 p-8 flex flex-col items-center">
-          <div className="w-full max-w-xl">
-            {/* Auth card */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 -mt-20 relative z-20">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-4">Login to your account</h2>
+          <h1 className="text-4xl font-bold text-gray-900 tracking-wide">
+            OnlyCampus
+          </h1>
+          <p className="mt-2 text-gray-600 text-lg max-w-xs text-center">
+            Your Digital Campus Ecosystem.
+          </p>
+        </div>
 
-              {/* Role tabs */}
-              <div className="flex items-center gap-2 mb-4 bg-gray-100 p-1 rounded-lg">
-                <button className="px-3 py-1 rounded-lg bg-white text-sm font-medium shadow-sm">Student</button>
-                <button className="px-3 py-1 rounded-lg text-sm font-medium text-gray-600">Faculty</button>
-                <button className="px-3 py-1 rounded-lg text-sm font-medium text-gray-600">Admin</button>
-                <div className="ml-auto text-xs text-gray-400">Use college email</div>
-              </div>
+        {/* Login Card */}
+        <div className="w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl px-6 lg:px-10 py-10 border border-green-100">
+          
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-semibold text-gray-800">Welcome Back</h2>
+            <p className="text-gray-500 text-sm">Login to your campus portal</p>
+          </div>
 
-              <form className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-600">Email</label>
-                  <input
-                    type="email"
-                    placeholder="you@college.edu"
-                    className="w-full mt-2 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
+          {/* Error */}
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 border border-red-300 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
 
-                <div>
-                  <label className="text-sm text-gray-600">Password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full mt-2 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 text-gray-600">
-                    <input type="checkbox" className="h-4 w-4 text-indigo-600" />
-                    Remember me
-                  </label>
-                  <a className="text-indigo-600 hover:underline">Forgot password?</a>
-                </div>
-
-                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium transition">
-                  Sign In
+          {/* Role Toggle */}
+          <div className="flex bg-green-100 p-1 rounded-xl border border-green-300 mb-6">
+            {["student", "faculty"].map((r) => {
+              const active = role === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r as Role)}
+                  className={`w-1/2 py-2 text-sm font-medium rounded-xl transition-all duration-200
+                    ${active 
+                      ? "bg-green-600 text-white shadow-md"
+                      : "text-green-700 hover:bg-green-200"
+                    }`}
+                >
+                  {r[0].toUpperCase() + r.slice(1)}
                 </button>
-              </form>
-
-              <div className="mt-4 text-center text-sm text-gray-500">
-                Don’t have an account? <a className="text-indigo-600 hover:underline">Sign up</a>
-              </div>
-            </div>
-
-            {/* Inspiration gallery */}
-            <section className="mt-8">
-              <h3 className="text-gray-700 font-semibold mb-4">Design inspiration</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {thumbnails.map((t) => (
-                  <div key={t.id} className="bg-white rounded-lg overflow-hidden shadow-sm">
-                    <div className="h-28 bg-gray-100 flex items-center justify-center">
-                      <svg className="w-12 h-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 7h18M3 12h18M3 17h18" />
-                      </svg>
-                    </div>
-                    <div className="p-3">
-                      <div className="text-sm font-medium text-gray-800">{t.title}</div>
-                      <div className="text-xs text-gray-500 mt-1">UI/UX · Inspiration</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+              );
+            })}
           </div>
 
-          {/* subtle footer */}
-          <footer className="mt-auto w-full max-w-xl text-center text-xs text-gray-400 py-6">
-            © OnlyCampus — Built for students, faculty and admins
-          </footer>
-        </main>
+          {/* Email */}
+          <label className="text-sm font-medium text-gray-700">Institutional Email</label>
+          <input
+            type="email"
+            placeholder="student@college.edu"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={`w-full mt-1 p-3 border rounded-lg text-gray-700 focus:ring-${PRIMARY} focus:ring-2`}
+            required
+          />
+
+          {/* Password */}
+          <label className="text-sm font-medium text-gray-700 mt-4 block">Password</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={`w-full mt-1 p-3 border rounded-lg text-gray-700 focus:ring-${PRIMARY} focus:ring-2`}
+            required
+          />
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            onClick={handleSubmit}
+            className={`w-full py-3 text-white font-semibold rounded-lg bg-${PRIMARY} hover:bg-${PRIMARY_HOVER} shadow-md transition mt-6`}
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
+
+          {/* Signup redirect */}
+          <p className="text-center text-gray-600 text-sm mt-4">
+            Don’t have an account?
+            <a href="/signup" className={`ml-1 text-${PRIMARY} font-semibold hover:underline`}>
+              Sign Up
+            </a>
+          </p>
+
+        </div>
       </div>
     </div>
   );

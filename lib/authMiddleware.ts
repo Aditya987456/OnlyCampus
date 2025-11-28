@@ -1,0 +1,25 @@
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+
+// Function to verify JWT from API requests
+export function verifyJWT(req: NextRequest) {
+  try {
+    // Expect token in Authorization header: Bearer <token>
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) return null;
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    return decoded;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Middleware helper for API routes
+export async function requireAuth(req: NextRequest, callback: Function) {
+  const user = verifyJWT(req);
+  if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
+  return callback(user); // pass the decoded JWT payload
+}
