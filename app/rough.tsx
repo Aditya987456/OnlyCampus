@@ -69,3 +69,15 @@
 // │── middleware.ts                # Protect routes, role-based redirects
 // │── package.json
 // │── tsconfig.json
+
+
+
+
+
+
+// npx tsc socket/server.ts --outDir socket/dist
+// Then run Node on the compiled JS:
+
+// bash
+// Copy code
+// node socket/dist/server.js

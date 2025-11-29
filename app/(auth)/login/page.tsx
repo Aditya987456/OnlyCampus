@@ -48,8 +48,8 @@ export default function Login() {
   localStorage.setItem("firstname", data.firstname);
 
   // redirect role-wise
-  if (role === "student") router.push("/student-dashboard");
-  else router.push("/faculty-dashboard");
+  if (role === "student") router.push("/dashboard/student-dashboard");
+  else router.push("/dashboard/faculty-dashboard");
 
     } catch (err) {
       toast.error("Something went wrong. Try again.");
