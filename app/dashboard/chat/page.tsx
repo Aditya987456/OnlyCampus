@@ -1,36 +1,34 @@
 // app/dashboard/chat/page.tsx
 "use client";
-import React, { useState } from 'react';
-import { Search, User, MessageSquare, Send, XCircle, Users } from 'lucide-react';
-// import { useSocket } from '@/context/socketContext'; // Will be used later
+import React, { useState, useEffect } from 'react';
+import { Search, MessageSquare, Send, XCircle, Users } from 'lucide-react';
+import { useSocket } from '@/context/socketContext'; 
+import { toast } from 'sonner';
+
+// Assuming IMeeting is also imported here if used in contact list logic
+// import { IChatMessage } from '@/lib/models/chatMessage'; 
 
 const PRIMARY_COLOR = 'green-600';
 const NEUTRAL_COLOR = 'gray-800';
 
-// --- Mock Data ---
-const mockContacts = [
-    { id: 'f1', name: 'Dr. Smith (Faculty)', role: 'Faculty', lastMessage: 'Check the new assignment.', unread: 2 },
-    { id: 's1', name: 'Alice Johnson', role: 'Student', lastMessage: 'Can you join the study group?', unread: 0 },
-    { id: 's2', name: 'Group: Project Alpha', role: 'Group', lastMessage: 'Meeting rescheduled to 4 PM.', unread: 5 },
-    { id: 's3', name: 'David Lee', role: 'Student', lastMessage: 'Thanks for the notes!', unread: 0 },
-];
-
-const mockMessages = [
-    { id: 1, text: 'Hello Dr. Smith, I had a question about the assignment.', senderId: 's_user', timestamp: '10:00 AM' },
-    { id: 2, text: 'Please review the lecture notes first, Alice.', senderId: 'f1', timestamp: '10:05 AM' },
-    { id: 3, text: 'Understood. Thank you!', senderId: 's_user', timestamp: '10:10 AM' },
-    { id: 4, text: 'The deadline has been extended to Friday.', senderId: 'f1', timestamp: '10:15 AM' },
-];
-
-// --- Sub-Components ---
-
-// 1. Contact Item
-interface ContactItemProps {
-    contact: typeof mockContacts[0];
-    isActive: boolean;
-    onClick: () => void;
+// --- Mock Data and Types ---
+// Define a client-side type for a message (based on the model)
+interface ClientChatMessage {
+    _id: string;
+    senderId: string;
+    recipientId: string;
+    content: string;
+    createdAt: string | Date;
 }
-const ContactItem: React.FC<ContactItemProps> = ({ contact, isActive, onClick }) => (
+
+const mockContacts = [
+    { id: 'f1', name: 'Dr. Smith (Faculty)', role: 'Faculty', lastMessage: 'Check the new assignment.', unread: 2, chatId: 'userA_f1' },
+    { id: 's1', name: 'Alice Johnson', role: 'Student', lastMessage: 'Can you join the study group?', unread: 0, chatId: 'userA_s1' },
+    { id: 's2', name: 'Group: Project Alpha', role: 'Group', lastMessage: 'Meeting rescheduled to 4 PM.', unread: 5, chatId: 'group_alpha' },
+];
+
+// --- Sub-Components (Unchanged) ---
+const ContactItem = ({ contact, isActive, onClick }: any) => (
     <div
         className={`flex items-center gap-3 p-4 cursor-pointer transition duration-150 border-b border-gray-100
             ${isActive ? `bg-${PRIMARY_COLOR}/10 border-l-4 border-${PRIMARY_COLOR}` : 'hover:bg-gray-50'}`}
@@ -52,41 +50,118 @@ const ContactItem: React.FC<ContactItemProps> = ({ contact, isActive, onClick })
     </div>
 );
 
-// 2. Chat Message
-interface ChatMessageProps {
-    message: typeof mockMessages[0];
-    isSender: boolean;
-}
-const ChatMessage: React.FC<ChatMessageProps> = ({ message, isSender }) => (
-    <div className={`flex mb-4 ${isSender ? 'justify-end' : 'justify-start'}`}>
-        <div className={`max-w-xs lg:max-w-md p-3 rounded-xl shadow-sm text-sm 
-            ${isSender 
-                ? `bg-${PRIMARY_COLOR} text-white rounded-br-none` 
-                : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'}`}
-        >
-            <p>{message.text}</p>
-            <span className={`block mt-1 text-xs ${isSender ? 'text-green-200' : 'text-gray-400'} text-right`}>
-                {message.timestamp}
-            </span>
+const ChatMessage: React.FC<{ message: ClientChatMessage, isSender: boolean }> = ({ message, isSender }) => {
+    const formatTime = (date: string | Date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    return (
+        <div className={`flex mb-4 ${isSender ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-xs lg:max-w-md p-3 rounded-xl shadow-sm text-sm 
+                ${isSender 
+                    ? `bg-${PRIMARY_COLOR} text-white rounded-br-none` 
+                    : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'}`}
+            >
+                <p>{message.content}</p>
+                <span className={`block mt-1 text-xs ${isSender ? 'text-green-200' : 'text-gray-400'} text-right`}>
+                    {formatTime(message.createdAt)}
+                </span>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // --- Main Chat Component ---
 
 export default function ChatPage() {
+    // Current user is mocked as 'userA' for sending/receiving logic
+    const CURRENT_USER_ID = 'userA'; 
+
     const [selectedContact, setSelectedContact] = useState<typeof mockContacts[0] | null>(mockContacts[0]);
+    const [messages, setMessages] = useState<ClientChatMessage[]>([]);
     const [messageInput, setMessageInput] = useState('');
-    // const socket = useSocket(); // Ready for integration
+    const [loading, setLoading] = useState(false);
+    const socket = useSocket();
 
-    const handleSendMessage = (e: React.FormEvent) => {
+    // --- 1. Fetch Messages on Contact Change ---
+    useEffect(() => {
+        if (!selectedContact) {
+            setMessages([]);
+            return;
+        }
+
+        const fetchMessages = async () => {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/chat?chatId=${selectedContact.chatId}`);
+                if (res.ok) {
+                    const data: ClientChatMessage[] = await res.json();
+                    setMessages(data);
+                } else {
+                    toast.error("Failed to load chat history.");
+                }
+            } catch (error) {
+                toast.error("An error occurred while loading messages.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchMessages();
+    }, [selectedContact]);
+
+
+    // --- 2. Real-time Socket Listener ---
+    useEffect(() => {
+        if (!socket) return;
+
+        const messageHandler = (newMessage: ClientChatMessage) => {
+            // Check if the received message belongs to the currently selected chat
+            if (newMessage.recipientId === selectedContact?.chatId) {
+                setMessages((prev) => [...prev, newMessage]);
+            } else {
+                // Future: Handle unread badge updates for other contacts
+                console.log('Received message for another chat:', newMessage.recipientId);
+            }
+        };
+
+        socket.on("chat-message-received", messageHandler); 
+
+        return () => {
+            socket.off("chat-message-received", messageHandler);
+        };
+    }, [socket, selectedContact]);
+
+
+    // --- 3. Send Message Function ---
+    const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (messageInput.trim() === '' || !selectedContact) return;
-
-        // Future: Implement Socket.IO emit logic here
-        console.log(`Sending message to ${selectedContact.name}: ${messageInput}`);
+        const content = messageInput.trim();
+        if (!content || !selectedContact) return;
 
         setMessageInput('');
+
+        try {
+            const newMessageData = {
+                senderId: CURRENT_USER_ID,
+                recipientId: selectedContact.chatId,
+                content: content,
+            };
+
+            const res = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newMessageData),
+            });
+
+            if (!res.ok) {
+                toast.error("Failed to send message.");
+                // If the post fails, the user will need to re-type or recover the message
+            }
+            // Note: We don't update local state here; we wait for the socket echo (chat-message-received)
+            // to ensure the message was persisted before displaying it.
+
+        } catch (err) {
+            toast.error("An unexpected error occurred while sending.");
+        }
     };
 
     return (
@@ -139,13 +214,17 @@ export default function ChatPage() {
 
                         {/* Message Area */}
                         <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                            {mockMessages.map((message) => (
-                                <ChatMessage
-                                    key={message.id}
-                                    message={message}
-                                    isSender={message.senderId === 's_user'} // Assume 's_user' is the current user
-                                />
-                            ))}
+                            {loading ? (
+                                <div className="text-center py-10 text-gray-500">Loading messages...</div>
+                            ) : (
+                                messages.map((message) => (
+                                    <ChatMessage
+                                        key={message._id}
+                                        message={message}
+                                        isSender={message.senderId === CURRENT_USER_ID}
+                                    />
+                                ))
+                            )}
                         </div>
 
                         {/* Input Area */}
@@ -162,7 +241,7 @@ export default function ChatPage() {
                                 <button
                                     type="submit"
                                     className={`bg-${PRIMARY_COLOR} text-white p-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50`}
-                                    disabled={!selectedContact || messageInput.trim() === ''}
+                                    disabled={!selectedContact || messageInput.trim() === '' || !socket}
                                 >
                                     <Send className="w-5 h-5" />
                                 </button>

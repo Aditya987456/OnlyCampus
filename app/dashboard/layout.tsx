@@ -18,9 +18,9 @@ interface DashboardLayoutProps {
 // --- Navigation Links Data ---
 const STUDENT_LINKS = [
   { href: "/dashboard/student-dashboard", label: "Dashboard", Icon: Home },
-  { href: "/dashboard/meetings", label: "Meetings", Icon: Calendar }, // Dedicated meeting page
-  { href: "/dashboard/announcements", label: "Announcements", Icon: Bell }, // Dedicated announcements page
-  { href: "/dashboard/chat", label: "Chat", Icon: MessageSquare }, // Dedicated chat page
+  { href: "/dashboard/meetings", label: "Meetings", Icon: Calendar },
+  { href: "/dashboard/announcements", label: "Announcements", Icon: Bell },
+  { href: "/dashboard/chat", label: "Chat", Icon: MessageSquare },
 ];
 
 const FACULTY_LINKS = [
@@ -32,7 +32,7 @@ const FACULTY_LINKS = [
 
 const GENERAL_LINKS = [
   { href: "/dashboard/profile", label: "Profile", Icon: User },
-  { href: "/dashboard/settings", label: "Settings", Icon: Briefcase }, // Replaced generic settings icon
+  { href: "/dashboard/settings", label: "Settings", Icon: Briefcase },
 ];
 
 // Custom NavLink component with corrected active state logic
@@ -42,9 +42,6 @@ const NavLink = ({ href, label, Icon }: any) => {
   // Logic to determine if a link is the main dashboard link
   const isDashboardLink = href.endsWith('dashboard');
 
-  // If it's a dashboard link, it's active if the current pathname starts with it.
-  // This keeps the dashboard highlighted when navigating to its sub-pages.
-  // If it's a specific page (like /meetings or /chat), it's active only on exact match.
   const isActive = isDashboardLink 
     ? pathname.startsWith(href)
     : pathname === href;
@@ -94,7 +91,6 @@ const Header = () => (
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const pathname = usePathname();
     
-    // Determine user role based on path segment
     const isStudent = pathname.includes("student-dashboard") || !pathname.includes("faculty-dashboard");
     const navLinks = isStudent ? STUDENT_LINKS : FACULTY_LINKS;
 

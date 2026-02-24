@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConnectDB } from "@/lib/mongoDBConnection";
-import { AllowedUserModel } from "@/lib/models/allowedUser";
 import { UserModel } from "@/lib/models/user";
 import bcrypt from "bcrypt";
-// import { Jwt } from "jsonwebtoken";
 import jwt from 'jsonwebtoken'
 import { JWT_SECRET } from "@/config/config";
 
@@ -27,6 +25,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email?.trim().toLowerCase();
     const normalizedPassword = password?.trim();
+
     if (!normalizedEmail || !role || !password) {
       return NextResponse.json(
         { message: "Email, role, and password are required" },
@@ -39,33 +38,37 @@ export async function POST(req: NextRequest) {
     }
 
 
-    //----# i think no need of this because wahi login kar payega jo register hai already 
-    // and registered user means valid.
-
-    // const allowed = await AllowedUserModel.findOne({
-    //   email: normalizedEmail,
-    //   role: normalizedRole,
-    //   allowed: true,
-    // });
-
-    // if (!allowed) {
-    //   return NextResponse.json({ message: "Email not allowed" }, { status: 403 });
-    // }
-
 
 //-----find is user exist or not?
-    const userExist=await UserModel.findOne({email})
-    if(!userExist){
+    const ClgKaAadmi = await UserModel.findOne({ email:normalizedEmail});
+
+    if(!ClgKaAadmi){
         return NextResponse.json(
-          { message: "Invalid emailId." },
+          { message: "User not found." },
           { status: 403 }
         );
+    }
+
+    //----checking is access or not..
+    if (!ClgKaAadmi.isAllowed) {
+      return NextResponse.json(
+        { message: "Access denied" },
+        { status: 403 }
+      );
+    }
+
+    //checking is password is null means not registered.
+    if (!ClgKaAadmi.isAllowed) {
+      return NextResponse.json(
+        { message: "Access denied" },
+        { status: 403 }
+      );
     }
 
 
 
 //----if user is there then compare the password with hashing.
-    const passwordValid = await bcrypt.compare(password, userExist.passwordHash)
+    const passwordValid = await bcrypt.compare(normalizedPassword, ClgKaAadmi.password)
       if(!passwordValid){
           return NextResponse.json(
               { message:'Incorrect password. Try again'},
@@ -75,13 +78,25 @@ export async function POST(req: NextRequest) {
 
 
 //-----after all things ok then signin for jwt.
-    const token = jwt.sign({ id: userExist._id }, JWT_SECRET);
+    // const token = jwt.sign({ id: ClgKaAadmi._id }, JWT_SECRET);
+
+    //storing things in frontend for use in dashboard or auto grp assigning...
+    const token = jwt.sign(
+      {
+        id: ClgKaAadmi._id,
+        role: ClgKaAadmi.role,
+        department: ClgKaAadmi.department,
+        year: ClgKaAadmi.year
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "7d" }
+    );
 
     return NextResponse.json(
       {
-        message: "Signin Successfully...",
+        message: "login Successfully...",
         token,
-        firstname: userExist.firstname,
+        //firstname: userExist.firstname,
       },
       { status: 200 }
     );
@@ -89,7 +104,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     return NextResponse.json(
-      { message: "Error in signing in right now." },
+      { message: "Error in logging in right now." },
       { status: 411 }
     );
   }

@@ -137,7 +137,7 @@ export default function SignUp() {
             {loading ? "Creating account..." : "Sign Up"}
           </button>
 
-          {/* Redirect */}
+          {/* Redirect  --> to login */}
           <p className="text-center text-gray-600 text-sm mt-4">
             Already have an account?
             <a onClick={() => router.push("/login")} className={`ml-1 text-${PRIMARY} font-semibold hover:underline cursor-pointer`}>

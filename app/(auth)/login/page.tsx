@@ -23,7 +23,7 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    try {
+  try {
   const res = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -44,12 +44,14 @@ export default function Login() {
 
   // save token
   localStorage.setItem("token", data.token);
-  localStorage.setItem("role", role);
-  localStorage.setItem("firstname", data.firstname);
+  // localStorage.setItem("role", role);
+  // localStorage.setItem("firstname", data.firstname);
+  localStorage.setItem("user", JSON.stringify(data.user));
+  router.push("/dashboard");
 
   // redirect role-wise
-  if (role === "student") router.push("/dashboard/student-dashboard");
-  else router.push("/dashboard/faculty-dashboard");
+  // if (role === "student") router.push("/dashboard/student-dashboard");
+  // else router.push("/dashboard/faculty-dashboard");
 
     } catch (err) {
       toast.error("Something went wrong. Try again.");
@@ -162,8 +164,8 @@ export default function Login() {
           {/* Signup redirect */}
           <p className="text-center text-gray-600 text-sm mt-4">
             Don’t have an account?
-            <a href="/signup" className={`ml-1 text-${PRIMARY} font-semibold hover:underline`}>
-              Sign Up
+            <a href="/register" className={`ml-1 text-${PRIMARY} font-semibold hover:underline`}>
+              Register
             </a>
           </p>
 

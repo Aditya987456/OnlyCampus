@@ -2,9 +2,10 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import AnnouncementPanel from "@/components/announcement"; // Kept for viewing recent announcements
-// Removed imports: FacultyAnnouncementForm, FacultyMeetingForm
-import { User, CalendarPlus, Bell, FileText, MessageSquare, ListPlus } from "lucide-react"; // Added ListPlus
+import AnnouncementPanel from "@/components/announcement";
+import FacultyMeetingForm from "@/components/FacultyMeetingForm"; 
+import FacultyMeetingSchedulePanel from "@/components/FacultyMeetingSchedulePanel";
+import { User, CalendarPlus, Bell, FileText, MessageSquare, ListPlus, Calendar } from "lucide-react";
 
 const PRIMARY_COLOR = "green-600";
 const NEUTRAL_COLOR = "gray-800";
@@ -70,23 +71,17 @@ export default function FacultyDashboard() {
       {/* --- Columns 2 & 3: Forms and Announcements --- */}
       <div className="lg:col-span-2 xl:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        {/* 3. Schedule Meeting Form (NOW QUICK LINK) */}
+        {/* 3. Schedule Meeting Form (FORM RE-INCLUDED) */}
         <div className="md:col-span-1">
             <DashboardCard title="Schedule Live Class" Icon={CalendarPlus} color="green-600" linkHref="/dashboard/meetings">
-                <div className="text-center py-5 bg-green-50/50 rounded-lg border border-green-100">
-                    <CalendarPlus className="w-8 h-8 text-green-500 mx-auto mb-2"/>
-                    <p className="text-gray-700 font-medium">Click here to access the full meeting management portal.</p>
-                </div>
+                <FacultyMeetingForm facultyName={faculty.name} /> 
             </DashboardCard>
         </div>
 
-        {/* 4. Post Announcement Form (NOW QUICK LINK) */}
+        {/* 4. Upcoming Meetings Schedule (NEW PANEL ADDED) */}
         <div className="md:col-span-1">
-            <DashboardCard title="Post Announcement" Icon={Bell} color="blue-500" linkHref="/dashboard/announcements">
-                <div className="text-center py-5 bg-blue-50/50 rounded-lg border border-blue-100">
-                    <ListPlus className="w-8 h-8 text-blue-500 mx-auto mb-2"/>
-                    <p className="text-gray-700 font-medium">Publish new messages and manage announcements.</p>
-                </div>
+            <DashboardCard title="Upcoming Meetings" Icon={Calendar} color="blue-500" linkHref="/dashboard/meetings">
+                <FacultyMeetingSchedulePanel /> 
             </DashboardCard>
         </div>
 

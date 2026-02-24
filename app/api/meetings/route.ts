@@ -1,86 +1,84 @@
 // app/api/meetings/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDB } from '@/utils/database'; // Adjust path as needed
-import Meeting from '@/models/meeting'; // Adjust path to your Mongoose model
-import { getSocketInstance } from '@/socket/socketHandler'; // Utility to get the server instance
+import { NextRequest, NextResponse } from "next/server";
+import { ConnectDB } from "@/lib/mongoDBConnection"; // Assume ConnectDB exists
+import MeetingModel, { IMeeting } from "@/lib/models/meeting"; // ✅ 1. Import the model
+import io from 'socket.io-client'; // For real-time broadcasting
 
-// --- 1. GET (Read Meetings) ---
-export async function GET(req: NextRequest) {
+// --- Configuration ---
+// Match the URL used in your SocketProvider
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
+
+// --- Utility function to emit a socket event ---
+const emitSocketEvent = (event: string, data: any) => {
+    try {
+        const socket = io(SOCKET_SERVER_URL, {
+            transports: ["websocket"],
+            reconnection: false, 
+            timeout: 5000,
+        });
+
+        socket.on('connect', () => {
+            socket.emit(event, data);
+            socket.disconnect(); 
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error from API:', err.message);
+        });
+
+    } catch (error) {
+        console.error("Error emitting socket event from API:", error);
+    }
+};
+
+// --- GET (Fetch Meetings) ---
+export async function GET() {
   try {
-    await connectToDB();
-
-    // Fetch all meetings, sorted by time (upcoming first)
-    const meetings = await Meeting.find({})
-      .sort({ time: 1 }) // Assuming 'time' is a Date field
-      .lean(); // Use .lean() for faster read performance
-
-    return NextResponse.json(meetings, { status: 200 });
+    await ConnectDB();
+    
+    // ✅ 2. Use 'time' property for sorting (as defined in IMeeting)
+    const meetings = await MeetingModel.find().sort({ time: 1 }).lean(); 
+    
+    // Note: In a real app, you'd filter by user/audience
+    return NextResponse.json({ meetings }, { status: 200 });
   } catch (error) {
-    console.error("Failed to fetch meetings:", error);
+    console.error("Meeting fetch error:", error);
     return NextResponse.json({ message: "Failed to fetch meetings" }, { status: 500 });
   }
 }
 
-// --- 2. POST (Create Meeting) ---
+// --- POST (Create Meeting) ---
 export async function POST(req: NextRequest) {
-  const { title, time, host, duration } = await req.json();
+  await ConnectDB();
+  
+  // ✅ 3. Destructure the time field as 'time' (matching the model)
+  // We'll rename the createdBy field to hostId to match the standard model structure
+  const { title, duration, meetingLink, time, hostId, host, targetAudience, description } = await req.json();
 
-  if (!title || !time || !host || !duration) {
-    return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+  // Basic validation (adjust fields as necessary)
+  if (!title || !time || !hostId || !meetingLink) {
+    return NextResponse.json({ message: "Missing required fields (title, time, hostId, meetingLink)" }, { status: 400 });
   }
 
   try {
-    await connectToDB();
-
-    const newMeeting = new Meeting({
-      title,
-      time: new Date(time), // Convert time string to Date object
-      host,
-      duration,
+    const newMeeting = await MeetingModel.create({ 
+        title, 
+        duration, 
+        meetingLink, 
+        time, // ✅ Use 'time'
+        hostId, 
+        host, // Assuming host name is passed
+        targetAudience, 
+        description 
     });
-
-    await newMeeting.save();
     
-    // Get Socket.IO instance and broadcast the new meeting
-    const io = getSocketInstance();
-    // Emit 'meeting-scheduled' to all connected clients
-    io.emit('meeting-scheduled', newMeeting); 
+    // Broadcast the new meeting for real-time update
+    emitSocketEvent('schedule-meeting', newMeeting.toObject()); 
 
-    return NextResponse.json(newMeeting, { status: 201 });
-  } catch (error) {
-    console.error("Failed to create meeting:", error);
-    return NextResponse.json({ message: "Failed to create meeting" }, { status: 500 });
-  }
-}
-
-// --- 3. DELETE (Delete/Cancel Meeting) ---
-// Note: This uses the body to pass the meeting ID, a common pattern in RESTful APIs
-// for operations that need a body payload but are deleting a resource.
-export async function DELETE(req: NextRequest) {
-  try {
-    const { meetingId } = await req.json();
-
-    if (!meetingId) {
-      return NextResponse.json({ message: "Missing meeting ID" }, { status: 400 });
-    }
-
-    await connectToDB();
-
-    const deletedMeeting = await Meeting.findByIdAndDelete(meetingId);
-
-    if (!deletedMeeting) {
-      return NextResponse.json({ message: "Meeting not found" }, { status: 404 });
-    }
-
-    // Get Socket.IO instance and broadcast the cancellation
-    const io = getSocketInstance();
-    // Emit 'meeting-canceled' with the ID of the deleted meeting
-    io.emit('meeting-canceled', meetingId); 
-
-    return NextResponse.json({ message: "Meeting deleted successfully" }, { status: 200 });
-  } catch (error) {
-    console.error("Failed to delete meeting:", error);
-    return NextResponse.json({ message: "Failed to delete meeting" }, { status: 500 });
+    return NextResponse.json({ meeting: newMeeting }, { status: 201 });
+  } catch (error: any) {
+    console.error("Meeting creation error:", error.message);
+    return NextResponse.json({ message: "Failed to create meeting", error: error.message }, { status: 500 });
   }
 }

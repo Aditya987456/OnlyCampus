@@ -12,7 +12,7 @@ const io = new Server(httpServer, {
 });
 
 io.on("connection", (socket) => {
-  console.log("🔌 New client connected:", socket.id);
+  console.log(" New client connected:", socket.id);
 
   // --- ANNOUNCEMENT LOGIC ---
   socket.on("create-announcement", (announcementData) => {
@@ -36,11 +36,11 @@ io.on("connection", (socket) => {
 
 
   socket.on("disconnect", () => {
-    console.log("❌ Client disconnected:", socket.id);
+    console.log(" Client disconnected:", socket.id);
   });
 });
 
 const PORT = 4000;
 httpServer.listen(PORT, () =>
-  console.log(`🚀 Socket.io server running on :${PORT}`)
+  console.log(` Socket.io server running on :${PORT}`)
 );

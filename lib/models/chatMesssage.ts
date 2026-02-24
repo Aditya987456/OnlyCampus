@@ -1,11 +1,10 @@
-// models/chatMessage.ts (Conceptual Mongoose Model)
-
+// lib/models/chatMessage.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 // Interface for type safety
 export interface IChatMessage extends Document {
     senderId: string;
-    recipientId: string; // Or chatId if using group chats
+    recipientId: string; // The ID of the conversation (e.g., concatenated user IDs or a group ID)
     content: string;
     createdAt: Date;
     read: boolean;
@@ -13,10 +12,10 @@ export interface IChatMessage extends Document {
 
 const ChatMessageSchema: Schema = new Schema({
     senderId: {
-        type: String, // Assuming sender ID is a simple string (e.g., user ID)
+        type: String, 
         required: true,
     },
-    recipientId: { // This identifies the recipient (individual or group chat ID)
+    recipientId: { // This identifies the conversation or "room"
         type: String,
         required: true,
         index: true,
