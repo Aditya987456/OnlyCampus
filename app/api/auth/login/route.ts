@@ -4,7 +4,7 @@ import { UserModel } from "@/lib/models/user";
 import bcrypt from "bcrypt";
 import jwt from 'jsonwebtoken'
 import { JWT_SECRET } from "@/config/config";
-
+import assignUserToGroup from "@/utils/autoAssignGrp";
 
 
 
@@ -58,12 +58,13 @@ export async function POST(req: NextRequest) {
     }
 
     //checking is password is null means not registered.
-    if (!ClgKaAadmi.isAllowed) {
-      return NextResponse.json(
-        { message: "Access denied" },
-        { status: 403 }
-      );
-    }
+    // check if user registered
+if (!ClgKaAadmi.password) {
+  return NextResponse.json(
+    { message: "Please register first." },
+    { status: 400 }
+  );
+}
 
 
 
@@ -77,6 +78,10 @@ export async function POST(req: NextRequest) {
       }
 
 
+  
+    await assignUserToGroup(ClgKaAadmi);
+
+
 //-----after all things ok then signin for jwt.
     // const token = jwt.sign({ id: ClgKaAadmi._id }, JWT_SECRET);
 
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
         department: ClgKaAadmi.department,
         year: ClgKaAadmi.year
       },
-      process.env.JWT_SECRET!,
+      JWT_SECRET,
       { expiresIn: "7d" }
     );
 
@@ -96,7 +101,13 @@ export async function POST(req: NextRequest) {
       {
         message: "login Successfully...",
         token,
-        //firstname: userExist.firstname,
+        user: {
+        id: ClgKaAadmi._id,
+        name: ClgKaAadmi.name,
+        role: ClgKaAadmi.role,
+        department: ClgKaAadmi.department,
+        year: ClgKaAadmi.year
+    }
       },
       { status: 200 }
     );

@@ -6,7 +6,7 @@ import { MONGODB_URL } from '@/config/config';
 
 
 
-//---------- React ki tarah not connect the databse simple because here server rerender frequently that cause problems...
+//---------- React ki tarah not connect the database simple because here server rerender frequently that cause problems...
 // We use the global object to cache the connection.
 // TypeScript now recognizes 'mongooseConn' due to the global.d.ts file.
 // The structure { conn: null, promise: null } matches the MongooseConnectionCache interface.
