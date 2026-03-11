@@ -1,84 +1,192 @@
-// app/api/meetings/route.ts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import { NextRequest, NextResponse } from "next/server";
-import { ConnectDB } from "@/lib/mongoDBConnection"; // Assume ConnectDB exists
-import MeetingModel, { IMeeting } from "@/lib/models/meeting"; // ✅ 1. Import the model
-import io from 'socket.io-client'; // For real-time broadcasting
+import { ConnectDB } from "@/lib/mongoDBConnection";
+import { MeetingModel } from "@/lib/models/meeting";
+import { GroupModel } from "@/lib/models/group";
+import { UserModel } from "@/lib/models/user";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "@/config/config";
 
-// --- Configuration ---
-// Match the URL used in your SocketProvider
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
+function getTokenFromHeader(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) return null;
 
-// --- Utility function to emit a socket event ---
-const emitSocketEvent = (event: string, data: any) => {
-    try {
-        const socket = io(SOCKET_SERVER_URL, {
-            transports: ["websocket"],
-            reconnection: false, 
-            timeout: 5000,
-        });
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2) return null;
 
-        socket.on('connect', () => {
-            socket.emit(event, data);
-            socket.disconnect(); 
-        });
+  return parts[1];
+}
 
-        socket.on('connect_error', (err) => {
-            console.error('Socket connection error from API:', err.message);
-        });
 
-    } catch (error) {
-        console.error("Error emitting socket event from API:", error);
-    }
-};
-
-// --- GET (Fetch Meetings) ---
-export async function GET() {
+export async function POST(req: NextRequest) {
   try {
     await ConnectDB();
-    
-    // ✅ 2. Use 'time' property for sorting (as defined in IMeeting)
-    const meetings = await MeetingModel.find().sort({ time: 1 }).lean(); 
-    
-    // Note: In a real app, you'd filter by user/audience
-    return NextResponse.json({ meetings }, { status: 200 });
+
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return NextResponse.json({ message: "No token provided" }, { status: 403 });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+    const user = await UserModel.findById(decoded.id);
+
+    if (!user || user.role.toLowerCase() !== "faculty") {
+      return NextResponse.json(
+        { message: "Only faculty can create meetings" },
+        { status: 403 }
+      );
+    }
+
+    const { title, groupName, scheduledAt } = await req.json();
+
+    if (!title || !groupName) {
+      return NextResponse.json(
+        { message: "Title and group required" },
+        { status: 400 }
+      );
+    }
+
+    const group = await GroupModel.findOne({ name: groupName });
+
+    if (!group) {
+      return NextResponse.json(
+        { message: "Group not found" },
+        { status: 404 }
+      );
+    }
+
+    //const { title, groupName, scheduledAt } = await req.json();
+
+const meeting = await MeetingModel.create({
+  title,
+  groupId: group._id,
+  createdBy: user._id,
+  scheduledAt: new Date(scheduledAt),
+  status: "scheduled",
+  meetingLink: `https://meet.jit.si/onlycampus-${Date.now()}`,
+});
+
+    return NextResponse.json(meeting);
+
   } catch (error) {
-    console.error("Meeting fetch error:", error);
-    return NextResponse.json({ message: "Failed to fetch meetings" }, { status: 500 });
+    console.error("MEETING ERROR:", error); // 🔥 IMPORTANT
+    return NextResponse.json(
+      { message: "Server error" },
+      { status: 500 }
+    );
   }
 }
 
-// --- POST (Create Meeting) ---
-export async function POST(req: NextRequest) {
-  await ConnectDB();
-  
-  // ✅ 3. Destructure the time field as 'time' (matching the model)
-  // We'll rename the createdBy field to hostId to match the standard model structure
-  const { title, duration, meetingLink, time, hostId, host, targetAudience, description } = await req.json();
 
-  // Basic validation (adjust fields as necessary)
-  if (!title || !time || !hostId || !meetingLink) {
-    return NextResponse.json({ message: "Missing required fields (title, time, hostId, meetingLink)" }, { status: 400 });
-  }
 
+// import mongoose from "mongoose";
+
+// export async function GET(req: NextRequest) {
+//   await ConnectDB();
+
+//   const { searchParams } = new URL(req.url);
+//   const groupId = searchParams.get("groupId");
+
+//   if (!groupId) {
+//     return NextResponse.json([]);
+//   }
+
+//   const meetings = await MeetingModel.find({
+//     groupId: new mongoose.Types.ObjectId(groupId),
+//   }).sort({ createdAt: -1 });
+
+//   return NextResponse.json(meetings);
+// }
+
+
+
+
+// import { NextRequest, NextResponse } from "next/server";
+// import { ConnectDB } from "@/lib/mongoDBConnection";
+// import { MeetingModel } from "@/lib/models/meeting";
+// import { GroupModel } from "@/lib/models/group";
+// import { UserModel } from "@/lib/models/user";
+// import jwt from "jsonwebtoken";
+// import { JWT_SECRET } from "@/config/config";
+
+
+
+
+
+
+
+
+
+
+
+
+
+export async function GET(req: NextRequest) {
   try {
-    const newMeeting = await MeetingModel.create({ 
-        title, 
-        duration, 
-        meetingLink, 
-        time, // ✅ Use 'time'
-        hostId, 
-        host, // Assuming host name is passed
-        targetAudience, 
-        description 
-    });
-    
-    // Broadcast the new meeting for real-time update
-    emitSocketEvent('schedule-meeting', newMeeting.toObject()); 
+    await ConnectDB();
 
-    return NextResponse.json({ meeting: newMeeting }, { status: 201 });
-  } catch (error: any) {
-    console.error("Meeting creation error:", error.message);
-    return NextResponse.json({ message: "Failed to create meeting", error: error.message }, { status: 500 });
+    // 🔐 Get token
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return NextResponse.json([], { status: 403 });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+    const user = await UserModel.findById(decoded.id);
+    if (!user) {
+      return NextResponse.json([], { status: 403 });
+    }
+
+    // 🔥 FACULTY → show all meetings they created
+    if (user.role === "faculty") {
+      const meetings = await MeetingModel.find({
+        createdBy: user._id,
+      }).sort({ createdAt: -1 });
+
+      return NextResponse.json(meetings);
+    }
+
+    // 🔥 STUDENT → show meetings of groups they belong to
+    if (user.role === "student") {
+      const groups = await GroupModel.find({
+        members: user._id,
+      });
+
+      const groupIds = groups.map((group) => group._id);
+
+      const meetings = await MeetingModel.find({
+        groupId: { $in: groupIds },
+      }).sort({ createdAt: -1 });
+
+      return NextResponse.json(meetings);
+    }
+
+    return NextResponse.json([]);
+
+  } catch (error) {
+    console.error("GET MEETINGS ERROR:", error);
+    return NextResponse.json([], { status: 500 });
   }
 }

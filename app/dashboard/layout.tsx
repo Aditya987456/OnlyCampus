@@ -139,18 +139,65 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import Sidebar from "@/components/sidebar";
+// export default function DashboardLayout({ children}:any) {
+//   return (
+//     <div className="flex">
+
+//       {/* Sidebar */}
+//       <aside className="w-64 bg-gray-100 p-4">
+//         <Sidebar />
+//       </aside>
+
+//       {/* Main Content */}
+//       <main className="flex-1 p-6">
+//         {children}
+//       </main>
+
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import Sidebar from "@/components/sidebar";
-export default function DashboardLayout({ children}:any) {
+
+export default function DashboardLayout({ children }: any) {
   return (
-    <div className="flex">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-100 p-4">
-        <Sidebar />
-      </aside>
+      <Sidebar />
 
       {/* Main Content */}
-      <main className="flex-1 p-6">
+      <main className="flex-1 overflow-y-auto">
         {children}
       </main>
 
