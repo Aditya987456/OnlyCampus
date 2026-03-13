@@ -1,89 +1,123 @@
-// components/FacultyAnnouncementForm.tsx
+
+
 "use client";
-import React, { useState } from "react";
-import { useSocket } from "@/context/socketContext";
+import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
-import { IAnnouncement } from "@/lib/models/announcement";
+import io from "socket.io-client";
 
-const PRIMARY_COLOR = "green-600";
-
-// Ensure the props interface is defined for type safety
-interface FacultyAnnouncementFormProps {
-  facultyName: string; 
-  facultyId: string;
-}
-
-export default function FacultyAnnouncementForm({ facultyName, facultyId }: FacultyAnnouncementFormProps) {
-  const socket = useSocket();
+export default function FacultyAnnouncementForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState("everyone");
+
+  //  Fetch student groups for dropdown
+  useEffect(() => {
+    const fetchGroups = async () => {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/groups/list", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setGroups(data);
+    };
+    fetchGroups();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !description) return toast.error("All fields are required");
-
+    if (!title || !description) return toast.error("All fields required");
     setLoading(true);
 
     try {
-      // 1. PERSIST to MongoDB
+      const token = localStorage.getItem("token");
+      const isEveryone = selectedGroupId === "everyone";
+
+      // #1 — save to MongoDB with token + groupId  ----> post request...
       const res = await fetch("/api/announcements", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, createdBy: facultyName }), 
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          groupId: isEveryone ? groups[0]?._id : selectedGroupId, // fallback for targetAll
+          targetAll: isEveryone
+        })
       });
 
-      // Explicitly type the response data
-      const data: { announcement?: IAnnouncement, message?: string } = await res.json();
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.message || "Failed");
 
-      if (!res.ok || !data.announcement) {
-          return toast.error(data.message || "Failed to create announcement");
-      }
+      // #2 — ring the bell via socket means tell socket that there is a new announcement here for all/ specific group.
+      const socket = io("http://localhost:4000");
+      socket.emit("new-announcement", {
+        groupId: isEveryone ? "everyone" : selectedGroupId,
+        announcement: data.announcement
+      });
 
-      // 2. BROADCAST via Socket.IO
-      // This sends the newly created announcement object to all connected clients
-      socket?.emit("create-announcement", data.announcement);
-
-      toast.success("Announcement created successfully!");
+      toast.success("Announcement published!");
       setTitle("");
       setDescription("");
-    } catch (err) {
-      toast.error("An unexpected error occurred.");
+    } catch {
+      toast.error("Something went wrong.");
     }
 
     setLoading(false);
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 h-fit">
-      <h2 className={`text-xl font-bold text-${PRIMARY_COLOR} mb-5 border-b pb-3 border-gray-200`}>
-        <span className="flex items-center gap-2"><Send className="w-5 h-5"/> Publish New Message</span>
+    <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+      <h2 className="text-xl font-bold text-green-600 mb-5 border-b pb-3 border-gray-200 flex items-center gap-2">
+        <Send className="w-5 h-5" /> Publish Announcement
       </h2>
+
       <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/*  Group Dropdown */}
+        <select
+          value={selectedGroupId}
+          onChange={(e) => setSelectedGroupId(e.target.value)}
+          className="w-full p-3 border border-gray-200 rounded-lg text-gray-700 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+        >
+          <option value="everyone">📢 Everyone</option>
+          {groups.map((g) => (
+            <option key={g._id} value={g._id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+
         <input
           type="text"
           placeholder="Announcement Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full p-3 border border-gray-200 rounded-lg text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 transition duration-150"
+          className="w-full p-3 border border-gray-200 rounded-lg text-gray-700 focus:border-green-500 focus:ring-2 focus:ring-green-100"
           required
         />
+
         <textarea
-          placeholder="Detailed Description of the announcement..."
+          placeholder="Description..."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full p-3 border border-gray-200 rounded-lg text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 transition duration-150"
-          rows={6}
+          className="w-full p-3 border border-gray-200 rounded-lg text-gray-700 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          rows={5}
           required
         />
+
         <button
           type="submit"
-          disabled={loading || !socket}
-          className={`w-full py-3 text-white font-semibold rounded-lg bg-green-600 hover:bg-green-700 shadow-lg transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed`}
+          disabled={loading}
+          className="w-full py-3 text-white font-semibold rounded-lg bg-green-600 hover:bg-green-700 shadow transition disabled:opacity-50"
         >
           {loading ? "Publishing..." : "Publish Announcement"}
         </button>
+
       </form>
     </div>
   );

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConnectDB } from "@/lib/mongoDBConnection";
 import { UserModel } from "@/lib/models/user";
 import bcrypt from "bcrypt";
+import assignUserToGroup from "@/utils/autoAssignGrp";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -79,6 +80,11 @@ export async function POST(req: NextRequest) {
     ClgKaAadmi.password = passwordHash;
     ClgKaAadmi.name = normalizedName;
     await ClgKaAadmi.save();
+
+ 
+
+    // **************auto assign grp******************************** yahi kar do...
+    await assignUserToGroup(ClgKaAadmi);
 
 
 

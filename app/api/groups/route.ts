@@ -1,34 +1,39 @@
+
+
 import { NextRequest, NextResponse } from "next/server";
 import { ConnectDB } from "@/lib/mongoDBConnection";
-import "@/lib/models"; // ensures all models are registered
+import "@/lib/models";
 import { GroupModel } from "@/lib/models/group";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "@/config/config";
 
 export async function GET(req: NextRequest) {
   try {
     await ConnectDB();
 
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { message: "UserId required" },
-        { status: 400 }
-      );
+    // Get userId from token, not URL
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // Find all groups where this user is a member
+    const token = authHeader.split(" ")[1];
+    let decoded: any;
+
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch {
+      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
+    }
+
     const groups = await GroupModel.find({
-      members: userId,
-    }).select("_id name type");
+      members: decoded.id,
+    }).select("_id name type department year"); //  added department & year
 
     return NextResponse.json(groups);
 
   } catch (error) {
     console.error("GET GROUPS ERROR:", error);
-    return NextResponse.json(
-      { message: "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
 }

@@ -52,6 +52,7 @@ export default function SignUp() {
       toast.success("Account created successfully!");
       setLoading(false);
 
+    //timeout is there to delay things  to show the toast messages...
       setTimeout(() => {
         router.push("/login"); // redirect to login page
       }, 1500);

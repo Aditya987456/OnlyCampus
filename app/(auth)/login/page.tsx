@@ -3,6 +3,7 @@ import React, { useState, FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { socket } from "@/lib/socket";
 
 type Role = "student" | "faculty";
 
@@ -47,6 +48,26 @@ export default function Login() {
   // localStorage.setItem("role", role);
   // localStorage.setItem("firstname", data.firstname);
   localStorage.setItem("user", JSON.stringify(data.user));
+
+
+
+
+
+
+
+
+
+// Connect socket AFTER login
+socket.connect();
+
+// Join their group room immediately
+socket.emit("join-group", data.user.groupId);
+
+
+
+
+
+  //-----------here put the timeout---+++++++++++++++++++++++++
   router.push("/dashboard");
 
   // redirect role-wise
@@ -94,6 +115,7 @@ export default function Login() {
         </div>
 
         {/* Login Card */}
+        {/* +++++++++++++++++use form tag here+++++++++++++++ */}
         <div className="w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl px-6 lg:px-10 py-10 border border-green-100">
           
           <div className="text-center mb-8">
@@ -170,6 +192,8 @@ export default function Login() {
           </p>
 
         </div>
+
+
       </div>
     </div>
   );
