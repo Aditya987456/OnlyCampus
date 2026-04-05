@@ -11,8 +11,8 @@
 // }
 
 
-//--- it will return true or false.
-function IsValidEmail(email: string): boolean {
+/** Institutional addresses allowed to use OnlyCampus (must match roster + domain). */
+export function isInstituteEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) return false;
 

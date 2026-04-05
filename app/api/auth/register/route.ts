@@ -1,39 +1,176 @@
 
+// import { NextRequest, NextResponse } from "next/server";
+// import { ConnectDB } from "@/lib/mongoDBConnection";
+// import { UserModel } from "@/lib/models/user";
+// import bcrypt from "bcrypt";
+// import assignUserToGroup from "@/utils/autoAssignGrp";
+
+// function isValidEmail(email: string) {
+//   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// }
+
+
+// export async function POST(req: NextRequest) {
+//   try {
+//     await ConnectDB();    //first thing connect db.
+
+//     const { email, role, password,name } = await req.json();
+
+
+//     const normalizedName = name?.trim();
+
+//     const normalizedEmail = email?.trim().toLowerCase();
+//     const normalizedPassword = password?.trim();
+
+//     // Validate required fields
+//     if (!normalizedEmail || !role || !normalizedPassword || !normalizedName) {
+//       return NextResponse.json(
+//         { message: "Name, email, role, and password are required" },
+//         { status: 400 }
+//       );
+//     }
+
+
+//     //before calling db to check firstly we check here also 
+//     if (!isValidEmail(normalizedEmail)) {
+//         return NextResponse.json({ error: "Invalid email formate" }, { status: 400 });
+//     }
+
+
+//     // Check if email is allowed
+//     const ClgKaAadmi = await UserModel.findOne({ email:normalizedEmail});
+
+//     if (!ClgKaAadmi) {
+//       return NextResponse.json({ 
+//          message: "Email not found in college records" },
+//          { status: 404 });
+//     }
+
+//     //checking is access or not.
+//     if (!ClgKaAadmi.isAllowed) {
+//       return NextResponse.json(
+//         { message: "Access denied" },
+//         { status: 403 }
+//       );
+//     }
+
+    
+//     // Check if user already exists --> if exist means password will not be null.
+//     if (ClgKaAadmi.password) {
+//       return NextResponse.json(
+//         { message: "Already registered. Please login." },
+//         { status: 409 }
+//       );
+//     }
+
+
+//     // Hashing the password
+//     const passwordHash = await bcrypt.hash(normalizedPassword, 10);
+
+    
+//     // ###Create new user --> no need here kyuki hamare pass already email ye sab hai like user created hain in our college database.
+//     // await UserModel.create({
+//     //     name :normalizedName,
+//     //     email :normalizedEmail,
+//     //     role,
+//     //     password:passwordHash 
+//     //   });
+
+//     //just update the user...
+//     ClgKaAadmi.password = passwordHash;
+//     ClgKaAadmi.name = normalizedName;
+//     await ClgKaAadmi.save();
+
+ 
+
+//     // **************auto assign grp******************************** yahi kar do...
+//     await assignUserToGroup(ClgKaAadmi);
+
+
+
+//     return NextResponse.json({ message: "Registered successfully" }, { status: 201 });
+
+//   } 
+//   catch (error: any) {
+
+//     console.error("Register error:", error);
+
+//     if (error.code === 11000) {
+//         return NextResponse.json(
+//             { message: "Username already exists" },
+//             {status: 409}
+
+//         ) }
+
+//     return NextResponse.json(
+//       { message: "Error during registration" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { NextRequest, NextResponse } from "next/server";
 import { ConnectDB } from "@/lib/mongoDBConnection";
 import { UserModel } from "@/lib/models/user";
 import bcrypt from "bcrypt";
 import assignUserToGroup from "@/utils/autoAssignGrp";
+import { isInstituteEmail } from "@/utils/validateEmail";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-
 export async function POST(req: NextRequest) {
   try {
-    await ConnectDB();    //first thing connect db.
+    await ConnectDB();
 
-    const { email, role, password,name } = await req.json();
-
+    const { email, password, name } = await req.json();
 
     const normalizedName = name?.trim();
-
     const normalizedEmail = email?.trim().toLowerCase();
     const normalizedPassword = password?.trim();
 
-    // Validate required fields
-    if (!normalizedEmail || !role || !normalizedPassword || !normalizedName) {
+    if (!normalizedEmail || !normalizedPassword || !normalizedName) {
       return NextResponse.json(
-        { message: "Name, email, role, and password are required" },
+        { message: "Name, email, and password are required" },
         { status: 400 }
       );
     }
 
-
-    //before calling db to check firstly we check here also 
     if (!isValidEmail(normalizedEmail)) {
-        return NextResponse.json({ error: "Invalid email formate" }, { status: 400 });
+      return NextResponse.json({ message: "Invalid email format" }, { status: 400 });
+    }
+
+    if (!isInstituteEmail(normalizedEmail)) {
+      return NextResponse.json(
+        { message: "Only institutional email addresses are allowed" },
+        { status: 403 }
+      );
     }
 
 
@@ -91,11 +228,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Registered successfully" }, { status: 201 });
 
   } 
-  catch (error: any) {
+  catch (error: unknown) {
 
     console.error("Register error:", error);
 
-    if (error.code === 11000) {
+    if (error && typeof error === "object" && "code" in error && (error as { code?: number }).code === 11000) {
         return NextResponse.json(
             { message: "Username already exists" },
             {status: 409}
@@ -108,3 +245,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
