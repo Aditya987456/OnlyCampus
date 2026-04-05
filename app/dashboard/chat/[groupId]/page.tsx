@@ -271,6 +271,26 @@ export default function ChatPage() {
     }
   }, [groupId, fetchMessages]);
 
+  useEffect(() => {
+    if (!groupId) return;
+
+    const onFocus = () => {
+      void fetchMessages();
+    };
+
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void fetchMessages();
+    }, 2000);
+
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [groupId, fetchMessages]);
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -337,17 +357,10 @@ export default function ChatPage() {
     });
     const savedMessage = await res.json();
     if (!res.ok) return;
-    const gid = Array.isArray(groupId) ? groupId[0] : groupId;
-    const roomId =
-      typeof savedMessage.groupId === "object" && savedMessage.groupId !== null
-        ? String((savedMessage.groupId as { _id?: string })._id ?? gid)
-        : String(savedMessage.groupId ?? gid);
     setMessages((prev) => {
       if (savedMessage._id && prev.some((m) => m._id === savedMessage._id)) return prev;
       return [...prev, savedMessage];
     });
-    ensureSocketConnected();
-    socket.emit("new-chat-message", { ...savedMessage, groupId: roomId });
     setContent("");
   };
 

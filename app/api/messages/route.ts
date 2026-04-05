@@ -86,7 +86,36 @@ import { MessageModel } from "@/lib/models/chatMesssage";
 import "@/lib/models/user";
 import "@/lib/models/group";
 import mongoose from "mongoose";
+import { io } from "socket.io-client";
 import { verifyJwtFromRequest, userIsGroupMember } from "@/lib/getAuth";
+
+const SOCKET_SERVER_URL =
+  process.env.SOCKET_SERVER_URL ||
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  "http://localhost:4000";
+
+function emitChatMessageRealtime(token: string, payload: unknown) {
+  try {
+    const client = io(SOCKET_SERVER_URL, {
+      transports: ["websocket"],
+      auth: { token },
+      forceNew: true,
+      reconnection: false,
+    });
+
+    client.on("connect", () => {
+      client.emit("new-chat-message", payload);
+      client.disconnect();
+    });
+
+    client.on("connect_error", (error) => {
+      console.error("CHAT SOCKET EMIT ERROR:", error.message);
+      client.disconnect();
+    });
+  } catch (error) {
+    console.error("CHAT SOCKET CLIENT ERROR:", error);
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -136,6 +165,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { groupId, content } = await req.json();
+    const authHeader = req.headers.get("authorization");
+    const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
 
     if (!groupId || !content?.trim()) {
       return NextResponse.json({ message: "Group and message required" }, { status: 400 });
@@ -157,6 +188,14 @@ export async function POST(req: NextRequest) {
     });
 
     const populated = await message.populate("senderId", "name");
+    if (token) {
+      const messageObject =
+        typeof populated.toObject === "function" ? populated.toObject() : populated;
+      emitChatMessageRealtime(token, {
+        ...messageObject,
+        groupId: String(groupId),
+      });
+    }
     return NextResponse.json(populated);
   } catch (error) {
     console.error("POST MESSAGE ERROR:", error);
