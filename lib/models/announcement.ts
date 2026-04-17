@@ -7,6 +7,11 @@ export interface IAnnouncement extends Document {
   createdBy: mongoose.Types.ObjectId; // ref to User
   groupId: mongoose.Types.ObjectId;   // which group this is for
   targetAll: boolean;                  // true = sent to everyone
+  attachments: {
+    name: string;
+    url: string;
+    mimeType: string;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +42,13 @@ const AnnouncementSchema: Schema = new mongoose.Schema(
       type: Boolean, 
       default: false        // true = broadcast to everyone
     },
+    attachments: [
+      {
+        name: { type: String, required: true, trim: true },
+        url: { type: String, required: true, trim: true },
+        mimeType: { type: String, required: true, trim: true },
+      },
+    ],
   },
   { timestamps: true }
 );

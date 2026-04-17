@@ -11,14 +11,15 @@
 // }
 
 
-/** Institutional addresses allowed to use OnlyCampus (must match roster + domain). */
+/** Temporary relaxed email validation: allow any properly formatted email. */
 export function isInstituteEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) return false;
 
-  return (
-    email.endsWith("@iert.ac.in") ||
-    email.endsWith("@faculty.iert.ac.in")
-  );
+  // Domain restriction is intentionally disabled for now.
+  // return (
+  //   email.endsWith("@iert.ac.in") ||
+  //   email.endsWith("@faculty.iert.ac.in")
+  // );
+  return true;
 }
-

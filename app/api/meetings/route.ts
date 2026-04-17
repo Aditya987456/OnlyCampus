@@ -247,7 +247,17 @@ import { MeetingModel } from "@/lib/models/meeting";
 import { GroupModel } from "@/lib/models/group";
 import { UserModel } from "@/lib/models/user";
 import { verifyJwtFromRequest } from "@/lib/getAuth";
-import { buildMeetingUrl } from "@/lib/meetingUrl";
+import {
+  resolveWherebyMeetingDetails,
+  serializeMeetingForRole,
+} from "@/lib/meetingUrl";
+import { sendMeetingScheduledEmails } from "@/lib/mailer";
+
+type GroupMemberContact = {
+  name?: string;
+  email?: string;
+  role?: string;
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -297,7 +307,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const group = await GroupModel.findOne({ name: groupName });
+    const group = await GroupModel.findOne({ name: groupName }).populate(
+      "members",
+      "name email role"
+    );
 
     if (!group) {
       return NextResponse.json(
@@ -320,20 +333,52 @@ export async function POST(req: NextRequest) {
 
     //const { title, groupName, scheduledAt } = await req.json();
 
+    const uniqueSeed = `${Date.now()}-${String(user._id)}`;
+    const { roomName, hostLink, participantLink } =
+      resolveWherebyMeetingDetails(uniqueSeed);
+
     const meeting = await MeetingModel.create({
       title,
       groupId: group._id,
       createdBy: user._id,
       scheduledAt: parsedDate,
       status: "scheduled",
-      meetingLink: buildMeetingUrl(`${Date.now()}-${String(user._id)}`),
+      roomName,
+      hostLink,
+      participantLink,
     });
 
     const populated = await MeetingModel.findById(meeting._id)
       .populate("groupId", "name")
       .populate("createdBy", "name");
 
-    return NextResponse.json(populated);
+    const groupMembers = Array.isArray(group?.members)
+      ? (group.members as GroupMemberContact[])
+      : [];
+
+    const studentRecipients = groupMembers
+      .filter(
+        (member): member is Required<Pick<GroupMemberContact, "email">> &
+          GroupMemberContact =>
+          member?.role === "student" && typeof member.email === "string"
+      )
+      .map((member) => ({
+        email: member.email,
+        name: typeof member.name === "string" ? member.name : "Student",
+      }));
+
+    try {
+      await sendMeetingScheduledEmails(studentRecipients, {
+        facultyName: user.name || "Faculty",
+        groupName: group.name,
+        meetingTitle: title,
+        scheduledAt: parsedDate,
+      });
+    } catch (mailError) {
+      console.error("MEETING EMAIL ERROR:", mailError);
+    }
+
+    return NextResponse.json(serializeMeetingForRole(populated, user.role));
 
   } catch (error) {
     console.error("MEETING ERROR:", error); //  IMPORTANT
@@ -411,7 +456,9 @@ export async function GET(req: NextRequest) {
         .populate("createdBy", "name")
         .sort({ createdAt: -1 });
 
-      return NextResponse.json(meetings);
+      return NextResponse.json(
+        meetings.map((meeting) => serializeMeetingForRole(meeting, user.role))
+      );
     }
 
     if (user.role === "student") {
@@ -428,7 +475,9 @@ export async function GET(req: NextRequest) {
         .populate("createdBy", "name")
         .sort({ createdAt: -1 });
 
-      return NextResponse.json(meetings);
+      return NextResponse.json(
+        meetings.map((meeting) => serializeMeetingForRole(meeting, user.role))
+      );
     }
 
     return NextResponse.json([]);
@@ -436,5 +485,51 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("GET MEETINGS ERROR:", error);
     return NextResponse.json([], { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await ConnectDB();
+
+    const decoded = verifyJwtFromRequest(req);
+    if (!decoded) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await UserModel.findById(decoded.id);
+    if (!user || user.role !== "faculty") {
+      return NextResponse.json(
+        { message: "Only faculty can delete meetings" },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const meetingId = searchParams.get("meetingId");
+
+    if (!meetingId) {
+      return NextResponse.json(
+        { message: "Meeting id is required" },
+        { status: 400 }
+      );
+    }
+
+    const meeting = await MeetingModel.findById(meetingId);
+
+    if (!meeting) {
+      return NextResponse.json({ message: "Meeting not found" }, { status: 404 });
+    }
+
+    if (meeting.createdBy.toString() !== decoded.id) {
+      return NextResponse.json({ message: "Not allowed" }, { status: 403 });
+    }
+
+    await MeetingModel.findByIdAndDelete(meetingId);
+
+    return NextResponse.json({ message: "Meeting deleted", meetingId });
+  } catch (error) {
+    console.error("DELETE MEETING ERROR:", error);
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
 }

@@ -69,6 +69,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConnectDB } from "@/lib/mongoDBConnection";
 import { MeetingModel } from "@/lib/models/meeting";
 import { verifyJwtFromRequest } from "@/lib/getAuth";
+import { serializeMeetingForRole } from "@/lib/meetingUrl";
 
 export async function POST(req: NextRequest) {
   await ConnectDB();
@@ -97,5 +98,5 @@ export async function POST(req: NextRequest) {
     .populate("groupId", "name")
     .populate("createdBy", "name");
 
-  return NextResponse.json(populated);
+  return NextResponse.json(serializeMeetingForRole(populated, decoded.role));
 }

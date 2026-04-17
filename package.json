@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
     "lint": "eslint",
-    "socket": "tsx socket/server.ts"
+    "socket": "tsx socket/server.ts",
+    "start": "node dist/socket/server.js"
   },
   "dependencies": {
     "@zegocloud/zego-uikit-prebuilt": "^2.17.0",
@@ -22,6 +22,7 @@
     "lucide-react": "^0.555.0",
     "mongoose": "^9.0.0",
     "next": "15.5.4",
+    "nodemailer": "^7.0.13",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "socket.io": "^4.8.1",
@@ -36,6 +37,7 @@
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

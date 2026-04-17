@@ -119,7 +119,7 @@ function emitChatMessageRealtime(token: string, payload: unknown) {
 
 export async function GET(req: NextRequest) {
   try {
-    await ConnectDB();
+    await ConnectDB();  //pahle db 
 
     const decoded = verifyJwtFromRequest(req);
     if (!decoded) {
@@ -199,6 +199,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(populated);
   } catch (error) {
     console.error("POST MESSAGE ERROR:", error);
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await ConnectDB(); //sabse pahle db connect... phir auth check... phir messageId check... phir ownership check... then delete
+
+    //verifying jwt...
+    const decoded = verifyJwtFromRequest(req);
+    if (!decoded) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const messageId = searchParams.get("messageId");
+
+    if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
+      return NextResponse.json({ message: "Invalid message" }, { status: 400 });
+    }
+
+    const message = await MessageModel.findById(messageId);
+    if (!message) {
+      return NextResponse.json({ message: "Message not found" }, { status: 404 });
+    }
+
+    if (String(message.senderId) !== decoded.id) {
+      return NextResponse.json({ message: "Not allowed" }, { status: 403 });
+    }
+
+    await MessageModel.findByIdAndDelete(messageId);
+
+    return NextResponse.json({
+      message: "Message deleted",
+      messageId,
+      groupId: String(message.groupId),
+    });
+  } catch (error) {
+    console.error("DELETE MESSAGE ERROR:", error);
     return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
 }

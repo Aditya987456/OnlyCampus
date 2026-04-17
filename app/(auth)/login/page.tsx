@@ -225,7 +225,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-type Role = "student" | "faculty";
+type Role = "student" | "faculty" | "admin";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -270,7 +270,7 @@ export default function Login() {
   // if (role === "student") router.push("/dashboard/student-dashboard");
   // else router.push("/dashboard/faculty-dashboard");
 
-    } catch (err) {
+    } catch {
       toast.error("Something went wrong. Try again.");
       setError("Something went wrong. Try again.");
     }
@@ -326,14 +326,14 @@ export default function Login() {
           )}
 
           <div className="flex bg-green-100 p-1 rounded-xl border border-green-300 mb-6">
-            {(["student", "faculty"] as const).map((r) => {
+            {(["student", "faculty", "admin"] as const).map((r) => {
               const active = role === r;
               return (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setRole(r)}
-                  className={`w-1/2 py-2 text-sm font-medium rounded-xl transition-all duration-200
+                  className={`w-1/3 py-2 text-sm font-medium rounded-xl transition-all duration-200
                     ${active
                       ? "bg-green-600 text-white shadow-md"
                       : "text-green-700 hover:bg-green-200"
@@ -386,4 +386,3 @@ export default function Login() {
     </div>
   );
 }
-

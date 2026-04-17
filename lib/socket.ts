@@ -7,7 +7,7 @@ const SOCKET_URL =
 
 /** Shared client; connect only after login via `socket.auth` + `socket.connect()`. */
 export const socket = io(SOCKET_URL, {
-  autoConnect: false,
+  autoConnect: false,   // Don't connect until we have a token
   transports: ["websocket", "polling"],
 });
 

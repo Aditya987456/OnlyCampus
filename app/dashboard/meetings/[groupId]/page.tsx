@@ -551,9 +551,22 @@ interface Meeting {
   title: string;
   scheduledAt: string;
   status: "scheduled" | "live" | "ended";
-  meetingLink: string;
+  meetingLink?: string;
+  hostLink?: string;
+  participantLink?: string;
+  roomName?: string;
   groupId?: string | { _id?: string; name?: string };
   createdBy?: string | { _id?: string; name?: string };
+}
+
+function getMeetingLaunchLink(
+  meeting: Pick<Meeting, "meetingLink" | "hostLink" | "participantLink">,
+  preferHost = false
+): string {
+  if (preferHost) {
+    return meeting.hostLink || meeting.meetingLink || meeting.participantLink || "";
+  }
+  return meeting.meetingLink || meeting.participantLink || meeting.hostLink || "";
 }
 
 function meetingRoomId(m: Pick<Meeting, "groupId">): string {
@@ -607,17 +620,22 @@ function StatusBadge({ status }: { status: Meeting["status"] }) {
 function MeetingCard({
   meeting,
   isFaculty,
+  canDelete,
   onStart,
   onEnd,
+  onDelete,
 }: {
   meeting: Meeting;
   isFaculty: boolean;
+  canDelete: boolean;
   onStart: (id: string) => void;
   onEnd: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const isLive = meeting.status === "live";
   const isScheduled = meeting.status === "scheduled";
   const isEnded = meeting.status === "ended";
+  const joinLink = getMeetingLaunchLink(meeting, isFaculty);
 
   return (
     <div
@@ -626,7 +644,7 @@ function MeetingCard({
         ${isLive
           ? "border-green-300 shadow-lg shadow-green-100"
           : isEnded
-          ? "border-gray-100 opacity-60"
+          ? "border-gray-200 shadow-sm"
           : "border-green-100 shadow-sm hover:shadow-md hover:border-green-200 hover:-translate-y-0.5"
         }
       `}
@@ -639,7 +657,7 @@ function MeetingCard({
       <div className="p-5">
         {/* Title + Badge */}
         <div className="flex items-start justify-between gap-3 mb-2">
-          <h3 className={`font-semibold text-base leading-tight ${isEnded ? "text-gray-400" : "text-gray-800"}`}>
+          <h3 className={`font-semibold text-base leading-tight ${isEnded ? "text-gray-700" : "text-gray-800"}`}>
             {meeting.title}
           </h3>
           <StatusBadge status={meeting.status} />
@@ -676,21 +694,32 @@ function MeetingCard({
         {/* Actions */}
         <div className="flex items-center gap-2 flex-wrap">
           {isFaculty && isScheduled && (
-            <button
-              onClick={() => onStart(meeting._id)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95 shadow-sm shadow-green-200"
-            >
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Start Session
-            </button>
+            <>
+              <button
+                onClick={() => onStart(meeting._id)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl transition-all active:scale-95 shadow-sm shadow-green-200"
+              >
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Start Session
+              </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(meeting._id)}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-red-200 text-red-700 hover:bg-red-50 text-sm font-semibold rounded-xl transition-all"
+                >
+                  Delete permanently
+                </button>
+              )}
+            </>
           )}
 
-          {isLive && (
+          {isLive && joinLink && (
             <>
               <a
-                href={meeting.meetingLink}
+                href={joinLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all shadow-md shadow-green-200 no-underline ${
@@ -715,7 +744,18 @@ function MeetingCard({
           )}
 
           {isEnded && (
-            <span className="text-xs text-gray-300 italic">Session has ended</span>
+            <>
+              <span className="text-xs text-gray-500 italic">Session has ended</span>
+              {isFaculty && canDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(meeting._id)}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-red-200 text-red-700 hover:bg-red-50 text-sm font-semibold rounded-xl transition-all"
+                >
+                  Delete permanently
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -771,7 +811,7 @@ function TabBtn({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ role?: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "live" | "scheduled" | "ended">("all");
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -887,6 +927,10 @@ export default function MeetingsPage() {
       ensureSocketConnected();
       socket.emit("meeting-updated", { groupId: rid, meeting: updated });
     }
+    const hostLaunchLink = getMeetingLaunchLink(updated, true);
+    if (hostLaunchLink) {
+      window.open(hostLaunchLink, "_blank", "noopener,noreferrer");
+    }
   };
 
 
@@ -912,6 +956,25 @@ export default function MeetingsPage() {
       ensureSocketConnected();
       socket.emit("meeting-updated", { groupId: rid, meeting: updated });
     }
+  };
+
+  const deleteMeeting = async (id: string) => {
+    const shouldDelete = window.confirm(
+      "Delete this meeting permanently from the database?"
+    );
+    if (!shouldDelete) return;
+
+    const token = localStorage.getItem("token");
+    const res = await fetch(`/api/meetings?meetingId=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) return;
+
+    setMeetings((prev) => prev.filter((m) => m._id !== id));
   };
 
 
@@ -1021,9 +1084,16 @@ export default function MeetingsPage() {
               </p>
               <p className="text-xs text-gray-400">Updates appear automatically when your faculty starts a session.</p>
             </div>
-            {liveMeetings[0]?.meetingLink && (
+            {(liveMeetings[0]?.meetingLink ||
+              liveMeetings[0]?.participantLink ||
+              liveMeetings[0]?.hostLink) && (
               <a
-                href={liveMeetings[0].meetingLink}
+                href={
+                  liveMeetings[0].meetingLink ||
+                  liveMeetings[0].participantLink ||
+                  liveMeetings[0].hostLink ||
+                  "#"
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 inline-flex items-center justify-center px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl no-underline"
@@ -1118,7 +1188,7 @@ export default function MeetingsPage() {
                   Happening Now
                 </p>
                 {liveMeetings.map((m) => (
-                  <MeetingCard key={m._id} meeting={m} isFaculty={isFaculty} onStart={startMeeting} onEnd={endMeeting} />
+                  <MeetingCard key={m._id} meeting={m} isFaculty={isFaculty} canDelete={false} onStart={startMeeting} onEnd={endMeeting} onDelete={deleteMeeting} />
                 ))}
 
                 {meetings.filter((m) => m.status !== "live").length > 0 && (
@@ -1129,7 +1199,7 @@ export default function MeetingsPage() {
                 {meetings
                   .filter((m) => m.status !== "live")
                   .map((m) => (
-                    <MeetingCard key={m._id} meeting={m} isFaculty={isFaculty} onStart={startMeeting} onEnd={endMeeting} />
+                    <MeetingCard key={m._id} meeting={m} isFaculty={isFaculty} canDelete={m.status !== "live"} onStart={startMeeting} onEnd={endMeeting} onDelete={deleteMeeting} />
                   ))}
 
 
@@ -1148,7 +1218,7 @@ export default function MeetingsPage() {
             {/* "All" tab with no live meetings, or other tabs */}
             {(activeTab !== "all" || liveMeetings.length === 0) &&
               filtered.map((m) => (
-                <MeetingCard key={m._id} meeting={m} isFaculty={isFaculty} onStart={startMeeting} onEnd={endMeeting} />
+                <MeetingCard key={m._id} meeting={m} isFaculty={isFaculty} canDelete={m.status !== "live"} onStart={startMeeting} onEnd={endMeeting} onDelete={deleteMeeting} />
               ))}
           </div>
         )}
@@ -1163,6 +1233,3 @@ export default function MeetingsPage() {
     </div>
   );
 }
-
-
-

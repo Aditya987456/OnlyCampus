@@ -14,6 +14,7 @@ const GroupSchema = new mongoose.Schema(
     department: String,
     year: String,
 
+    //yahi list hai users ke kisi group me , members array me user ke _id honge as reference to User collection, taki hume pata chale ki kaunse users kis group me hain, aur jab hume group ke members ki details chahiye toh hum User collection se populate kar sakte hain using these ObjectIds.
     members: [
       {
         type: Schema.Types.ObjectId,

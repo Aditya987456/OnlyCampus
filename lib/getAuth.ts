@@ -4,6 +4,8 @@ import { JWT_SECRET } from "@/config/config";
 import { GroupModel } from "@/lib/models/group";
 import mongoose from "mongoose";
 
+
+//jwtpayload me user ka id, role, deparment, yr yahi sab hoga jo humne use kiya tha during generating token in login...
 export type JwtPayload = {
   id: string;
   role: string;

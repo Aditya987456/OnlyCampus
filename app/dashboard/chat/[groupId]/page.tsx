@@ -218,7 +218,7 @@ import {
   CHAT_RECONNECT_EVENT,
 } from "@/components/DashboardRealtimeBridge";
 import { ensureSocketConnected, socket } from "@/lib/socket";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, Trash2 } from "lucide-react";
 
 type ChatUser = {
   id?: string;
@@ -231,6 +231,7 @@ type ChatMessage = {
   groupId?: string | { _id?: string };
   senderId?: ChatUser;
   content?: string;
+  createdAt?: string;
 };
 
 export default function ChatPage() {
@@ -302,6 +303,11 @@ export default function ChatPage() {
     if (!gid) return;
 
     const appendMessage = (message: ChatMessage) => {
+      if (typeof (message as { deletedId?: string }).deletedId === "string") {
+        const deletedId = (message as { deletedId: string }).deletedId;
+        setMessages((prev) => prev.filter((item) => item._id !== deletedId));
+        return;
+      }
       const msgGid =
         typeof message.groupId === "object" && message.groupId?._id != null
           ? String(message.groupId._id)
@@ -362,6 +368,31 @@ export default function ChatPage() {
       return [...prev, savedMessage];
     });
     setContent("");
+  };
+
+  const deleteMessage = async (messageId?: string) => {
+    if (!messageId) return;
+    const confirmed = window.confirm("Delete this message?");
+    if (!confirmed) return;
+
+    const token = localStorage.getItem("token");
+    const gid = Array.isArray(groupId) ? groupId[0] : groupId;
+    const res = await fetch(`/api/messages?messageId=${encodeURIComponent(messageId)}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    setMessages((prev) => prev.filter((message) => message._id !== messageId));
+
+    if (gid) {
+      ensureSocketConnected();
+      socket.emit("delete-chat-message", {
+        groupId: String(gid),
+        deletedId: data.messageId || messageId,
+      });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -431,6 +462,26 @@ export default function ChatPage() {
                   }`}
                 >
                   {msg.content}
+                </div>
+                <div className={`flex items-center gap-2 px-1 ${own ? "justify-end" : "justify-start"}`}>
+                  {msg.createdAt && (
+                    <span className="text-[11px] text-gray-400">
+                      {new Date(msg.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  )}
+                  {own && (
+                    <button
+                      type="button"
+                      onClick={() => deleteMessage(msg._id)}
+                      className="text-gray-400 transition hover:text-red-600"
+                      aria-label="Delete message"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
